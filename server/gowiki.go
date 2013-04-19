@@ -1,10 +1,7 @@
-// Copyright 2010 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-package main
+package gowiki
 
 import (
+  "appengine"
   "html/template"
   "io/ioutil"
   "net/http"
@@ -18,9 +15,11 @@ type Page struct {
   Body  []byte
 }
 
+const BASE_PATH = "app/"
+
 const (
-  VIEW_PATH = "view/"
-  DATA_PATH = "data/"
+  VIEW_PATH = BASE_PATH + "view/"
+  DATA_PATH = BASE_PATH + "data/"
 )
 
 func (p *Page) save() error {
@@ -29,15 +28,18 @@ func (p *Page) save() error {
 }
 
 func loadPage(title string) (*Page, error) {
+  log.Println("load page")
   filename := DATA_PATH + title + ".txt"
   body, err := ioutil.ReadFile(filename)
   if err != nil {
+    log.Println("Error loading page")
     return nil, err
   }
   return &Page{Title: title, Body: body}, nil
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
+  log.Println("print please")
   list, err := ioutil.ReadDir(DATA_PATH)
   if err != nil {
     http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -61,6 +63,8 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
+  c := appengine.NewContext(r)
+  c.Infof("view handler")
   p, err := loadPage(title)
   if err != nil {
     http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -113,10 +117,10 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
   }
 }
 
-func main() {
+func init() {
   http.HandleFunc("/", rootHandler)
   http.HandleFunc("/view/", makeHandler(viewHandler))
   http.HandleFunc("/edit/", makeHandler(editHandler))
   http.HandleFunc("/save/", makeHandler(saveHandler))
-  http.ListenAndServe(":8080", nil)
+  //http.ListenAndServe(":8080", nil)
 }
