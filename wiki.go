@@ -8,7 +8,9 @@ import (
   "html/template"
   "io/ioutil"
   "net/http"
+  "strings"
   "regexp"
+  "log"
 )
 
 type Page struct {
@@ -16,8 +18,10 @@ type Page struct {
   Body  []byte
 }
 
-const VIEW_PATH = "view/"
-const DATA_PATH = "data/"
+const (
+  VIEW_PATH = "view/"
+  DATA_PATH = "data/"
+)
 
 func (p *Page) save() error {
   filename := DATA_PATH + p.Title + ".txt"
@@ -31,6 +35,29 @@ func loadPage(title string) (*Page, error) {
     return nil, err
   }
   return &Page{Title: title, Body: body}, nil
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+  list, err := ioutil.ReadDir(DATA_PATH)
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
+
+
+  _len := len(list)
+  var _pages []string
+  _pages = make([]string, _len)
+
+  for i := 0; i < _len; i++ {
+    log.Println(list[i].Name())
+    _pages[i] = strings.Replace(list[i].Name(), ".txt", "", -1)
+  }
+
+  error := templates.ExecuteTemplate(w, "home.html", _pages)
+  if error != nil {
+    http.Error(w, error.Error(), http.StatusInternalServerError)
+  }
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
@@ -62,7 +89,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 
-var templates = template.Must(template.ParseFiles(VIEW_PATH + "edit.html", VIEW_PATH + "view.html"))
+var templates = template.Must(template.ParseFiles(VIEW_PATH + "home.html", VIEW_PATH + "edit.html", VIEW_PATH + "view.html"))
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
   err := templates.ExecuteTemplate(w, tmpl + ".html", p)
@@ -87,6 +114,7 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func main() {
+  http.HandleFunc("/", rootHandler)
   http.HandleFunc("/view/", makeHandler(viewHandler))
   http.HandleFunc("/edit/", makeHandler(editHandler))
   http.HandleFunc("/save/", makeHandler(saveHandler))
